@@ -1,0 +1,174 @@
+from app.routers import mlops
+from app.routers import review_workflow
+from app.routers import pdf_compat
+from app.routers import fixed_pdf
+from app.routers import loan_fix_pdf
+from app.routers import live_pdf
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import settings
+from app.database import Base, SessionLocal, engine
+from app.models.application import Application
+from app.models.application_document import ApplicationDocument
+from app.models.extracted_field import ExtractedField
+from app.models.extracted_text import ExtractedText
+from app.models.ml_model import MLModel
+from app.models.notification import Notification
+from app.models.prediction import Prediction
+from app.models.review import Review
+from app.models.user import User
+from app.routers import (
+    applications,
+    auth,
+    ml_models,
+    notifications,
+    predictions,
+    reports,
+    reviews,
+    users,
+)
+from app.services.auth_service import get_user_by_email, hash_password
+
+
+def create_or_reset_default_accounts():
+    db = SessionLocal()
+
+    try:
+        default_users = [
+            {
+                "full_name": "SmartLoan Admin",
+                "email": "admin@smartloan.ai",
+                "phone": "01700000000",
+                "password": "12345678",
+                "role": "admin",
+            },
+            {
+                "full_name": "SmartLoan User",
+                "email": "user@smartloan.ai",
+                "phone": "01800000000",
+                "password": "12345678",
+                "role": "user",
+            },
+        ]
+
+        for item in default_users:
+            user = get_user_by_email(db, item["email"])
+
+            if user:
+                user.full_name = item["full_name"]
+                user.phone = item["phone"]
+                user.hashed_password = hash_password(item["password"])
+                user.role = item["role"]
+                user.is_active = True
+            else:
+                user = User(
+                    full_name=item["full_name"],
+                    email=item["email"],
+                    phone=item["phone"],
+                    hashed_password=hash_password(item["password"]),
+                    role=item["role"],
+                    is_active=True,
+                )
+                db.add(user)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+
+def create_default_ml_model():
+    db = SessionLocal()
+
+    try:
+        existing_model = (
+            db.query(MLModel)
+            .filter(MLModel.model_name == "Baseline Loan Risk Model")
+            .first()
+        )
+
+        if not existing_model:
+            model = MLModel(
+                model_name="Baseline Loan Risk Model",
+                model_type="baseline_rule_model",
+                version="v1",
+                status="deployed",
+                is_active=True,
+                accuracy=0.80,
+                precision=0.78,
+                recall=0.76,
+                f1_score=0.77,
+                description="Default baseline model for SmartLoan AI prediction workflow.",
+            )
+            db.add(model)
+            db.commit()
+
+    finally:
+        db.close()
+
+
+app = FastAPI(
+    title=settings.project_name,
+    version="0.8.0",
+    description="SmartLoan AI backend API.",
+)
+
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+def on_startup():
+    Base.metadata.create_all(bind=engine)
+    create_or_reset_default_accounts()
+    create_default_ml_model()
+
+
+app.include_router(live_pdf.router, prefix=settings.api_v1_prefix)
+app.include_router(auth.router, prefix=settings.api_v1_prefix)
+app.include_router(users.router, prefix=settings.api_v1_prefix)
+app.include_router(pdf_compat.router, prefix=settings.api_v1_prefix)
+app.include_router(review_workflow.compat_router, prefix=settings.api_v1_prefix)
+app.include_router(review_workflow.router, prefix=settings.api_v1_prefix)
+app.include_router(applications.router, prefix=settings.api_v1_prefix)
+app.include_router(reviews.router, prefix=settings.api_v1_prefix)
+app.include_router(notifications.router, prefix=settings.api_v1_prefix)
+app.include_router(ml_models.router, prefix=settings.api_v1_prefix)
+app.include_router(predictions.router, prefix=settings.api_v1_prefix)
+app.include_router(reports.router, prefix=settings.api_v1_prefix)
+
+
+@app.get("/")
+def root():
+    return {
+        "message": "SmartLoan AI backend is running",
+        "version": "0.8.0",
+    }
+
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "project": settings.project_name,
+    }
+
+from app.routers.pdf_workflow import router as pdf_workflow_router
+app.include_router(pdf_workflow_router)
+app.include_router(loan_fix_pdf.router, prefix=settings.api_v1_prefix)
+app.include_router(fixed_pdf.router, prefix=settings.api_v1_prefix)
+app.include_router(mlops.router, prefix=settings.api_v1_prefix)
+from app.routers import reports
+from app.routers import ai_pilot
+app.include_router(ai_pilot.router, prefix="/api/v1")

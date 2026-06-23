@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+*.bak
+.cache
+.vite
+coverage
+npm-debug.log
+yarn-error.log

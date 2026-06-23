@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartloan-ai-backend
+    ports:
+      - "20000:20000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=sqlite:////app/smartloan_ai.db
+      - SMARTLOAN_CUSTOMER_DB_PATH=/app/smartloan_customer_portal.db
+      - SMARTLOAN_RAG_DB_PATH=/app/smartloan_ai_rag.db
+    volumes:
+      - ./backend/smartloan_ai.db:/app/smartloan_ai.db
+      - ./backend/smartloan_customer_portal.db:/app/smartloan_customer_portal.db
+      - ./backend/smartloan_ai_rag.db:/app/smartloan_ai_rag.db
+      - ./backend/storage:/app/storage
+      - ./backend/uploads:/app/uploads
+      - ./backend/data:/app/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smartloan-ai-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

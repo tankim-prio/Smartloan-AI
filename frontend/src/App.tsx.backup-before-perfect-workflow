@@ -1,0 +1,2211 @@
+﻿import React, { createContext, useContext, useEffect, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import axios from "axios";
+import {
+  BrowserRouter,
+  Navigate,
+  NavLink,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router-dom";
+import "./index.css";
+
+const API_BASE_URL = "/api/v1";
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("smartloan_token");
+
+  if (token) {
+    config.headers = config.headers || {};
+    (config.headers as any).Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+type UserRole = "admin" | "user";
+
+type User = {
+  id: number;
+  full_name: string;
+  email: string;
+  phone?: string | null;
+  role: UserRole;
+  is_active: boolean;
+};
+
+type LoginResponse = {
+  access_token: string;
+  token_type: string;
+  user: User;
+};
+
+type Application = {
+  id: number;
+  user_id: number;
+  first_name: string;
+  last_name: string;
+  father_name: string;
+  mother_name: string;
+  age: number;
+  phone: string;
+  email: string;
+  address: string;
+  occupation?: string | null;
+  monthly_income?: number | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ApplicationDocument = {
+  id: number;
+  application_id: number;
+  document_type: string;
+  original_file_name: string;
+  stored_file_name: string;
+  file_path: string;
+  content_type?: string | null;
+  uploaded_at: string;
+};
+
+type ExtractedField = {
+  id: number;
+  application_id: number;
+  field_name: string;
+  field_value: string;
+  confidence_score: number;
+  created_at: string;
+};
+
+type Prediction = {
+  id: number;
+  application_id: number;
+  model_id: number;
+  prediction_result: string;
+  risk_level: string;
+  confidence_score: number;
+  reason: string;
+  created_at: string;
+};
+
+type Review = {
+  id: number;
+  application_id: number;
+  admin_id: number;
+  review_status: string;
+  review_note?: string | null;
+  created_at: string;
+};
+
+type NotificationItem = {
+  id: number;
+  user_id: number;
+  application_id?: number | null;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+type MLModel = {
+  id: number;
+  model_name: string;
+  model_type: string;
+  version: string;
+  accuracy?: number | null;
+  precision?: number | null;
+  recall?: number | null;
+  f1_score?: number | null;
+  status: string;
+  is_active: boolean;
+  description?: string | null;
+  created_at: string;
+  deployed_at?: string | null;
+};
+
+type DashboardOverview = {
+  total_applications: number;
+  draft_applications: number;
+  pending_reviews: number;
+  approved_applications: number;
+  rejected_applications: number;
+  need_more_information: number;
+  total_predictions: number;
+  low_risk_predictions: number;
+  medium_risk_predictions: number;
+  high_risk_predictions: number;
+  total_reviews: number;
+  total_users: number;
+  active_model_name?: string | null;
+  active_model_version?: string | null;
+};
+
+type StatusCount = {
+  status: string;
+  count: number;
+};
+
+type MonthlyReport = {
+  month: string;
+  total_applications: number;
+};
+
+type PredictionReport = {
+  total_predictions: number;
+  low_risk: number;
+  medium_risk: number;
+  high_risk: number;
+  recommended_approval: number;
+  manual_review: number;
+  not_recommended: number;
+};
+
+type ReviewReport = {
+  total_reviews: number;
+  approved: number;
+  rejected: number;
+  need_more_information: number;
+};
+
+type AuthContextValue = {
+  user: User | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  signOut: () => void;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+function getApiError(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+
+    if (typeof detail === "string") {
+      return detail;
+    }
+
+    if (detail) {
+      return JSON.stringify(detail);
+    }
+
+    return error.message;
+  }
+
+  return "Something went wrong.";
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Date(value).toLocaleString();
+}
+
+function formatPercent(value?: number | null) {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  return `${Math.round(value * 100)}%`;
+}
+
+function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("smartloan_token");
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    api
+      .get<User>("/auth/me")
+      .then((response) => {
+        setUser(response.data);
+      })
+      .catch(() => {
+        localStorage.removeItem("smartloan_token");
+        setUser(null);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const response = await api.post<LoginResponse>("/auth/login", {
+      email,
+      password,
+    });
+
+    localStorage.setItem("smartloan_token", response.data.access_token);
+    setUser(response.data.user);
+  };
+
+  const signOut = () => {
+    localStorage.removeItem("smartloan_token");
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used inside AuthProvider");
+  }
+
+  return context;
+}
+
+function ProtectedRoute({
+  children,
+  roles,
+}: {
+  children: ReactNode;
+  roles?: UserRole[];
+}) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <main className="center-page">
+        <div className="card small-card">Loading SmartLoan AI...</div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (roles && !roles.includes(user.role)) {
+    return (
+      <Navigate
+        to={user.role === "admin" ? "/admin/dashboard" : "/user/home"}
+        replace
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
+function StatusBadge({ value }: { value: string }) {
+  return <span className={`badge badge-${value}`}>{value.replaceAll("_", " ")}</span>;
+}
+
+function RiskBadge({ value }: { value: string }) {
+  return <span className={`badge risk-${value}`}>{value}</span>;
+}
+
+function AppLayout({ children }: { children: ReactNode }) {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const adminMenu = [
+    { label: "Dashboard", path: "/admin/dashboard" },
+    { label: "Apply", path: "/apply" },
+    { label: "Reviews", path: "/admin/reviews" },
+    { label: "ML Model", path: "/admin/ml-model" },
+    { label: "Reports", path: "/admin/reports" },
+    { label: "AI Pilot", path: "/admin/ai-pilot" },
+    { label: "Create Account", path: "/admin/create-account" },
+  ];
+
+  const userMenu = [
+    { label: "Home", path: "/user/home" },
+    { label: "Apply", path: "/apply" },
+    { label: "Notifications", path: "/user/notifications" },
+  ];
+
+  const menu = user?.role === "admin" ? adminMenu : userMenu;
+
+  const handleSignOut = () => {
+    signOut();
+    navigate("/login");
+  };
+
+  return (
+    <main className="app-shell">
+      <aside className="sidebar">
+        <div>
+          <h1>SmartLoan AI</h1>
+          <p>{user?.role === "admin" ? "Admin Panel" : "User Panel"}</p>
+        </div>
+
+        <nav>
+          {menu.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                isActive ? "nav-item active" : "nav-item"
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <button className="btn danger full" onClick={handleSignOut}>
+          Sign out
+        </button>
+      </aside>
+
+      <section className="content">
+        <header className="topbar">
+          <div>
+            <p>Logged in as</p>
+            <h2>{user?.full_name}</h2>
+          </div>
+
+          <span className="role-pill">{user?.role.toUpperCase()}</span>
+        </header>
+
+        <section className="page-content">{children}</section>
+      </section>
+    </main>
+  );
+}
+
+function LoginPage() {
+  const { user, login } = useAuth();
+  const [email, setEmail] = useState("admin@smartloan.ai");
+  const [password, setPassword] = useState("12345678");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  if (user) {
+    return (
+      <Navigate
+        to={user.role === "admin" ? "/admin/dashboard" : "/user/home"}
+        replace
+      />
+    );
+  }
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setMessage("");
+    setLoading(true);
+
+    try {
+      await login(email, password);
+    } catch (error) {
+      setMessage(getApiError(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="login-page">
+      <form className="login-card" onSubmit={handleSubmit}>
+        <p className="eyebrow">SmartLoan AI Platform</p>
+        <h1>Login</h1>
+        <p className="muted">Access your dashboard, applications, reviews, and reports.</p>
+
+        <label>Email</label>
+        <input value={email} onChange={(event) => setEmail(event.target.value)} />
+
+        <label>Password</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+
+        {message && <div className="alert error">{message}</div>}
+
+        <button className="btn primary full" disabled={loading}>
+          {loading ? "Logging in..." : "Login"}
+        </button>
+
+        <div className="demo-box">
+          <button
+            type="button"
+            onClick={() => {
+              setEmail("admin@smartloan.ai");
+              setPassword("12345678");
+            }}
+          >
+            Admin: admin@smartloan.ai / 12345678
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEmail("user@smartloan.ai");
+              setPassword("12345678");
+            }}
+          >
+            User: user@smartloan.ai / 12345678
+          </button>
+        </div>
+      </form>
+    </main>
+  );
+}
+
+function AdminDashboardPage() {
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [message, setMessage] = useState("");
+
+  const loadData = async () => {
+    try {
+      const [overviewResponse, applicationsResponse] = await Promise.all([
+        api.get<DashboardOverview>("/reports/overview"),
+        api.get<Application[]>("/applications/admin/all"),
+      ]);
+
+      setOverview(overviewResponse.data);
+      setApplications(applicationsResponse.data);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>Admin Dashboard</h1>
+          <p>Application, review, prediction, and model overview.</p>
+        </div>
+
+        <button className="btn secondary" onClick={loadData}>Refresh</button>
+      </div>
+
+      {message && <div className="alert error">{message}</div>}
+
+      <div className="stats-grid">
+        <div className="stat-card">
+          <p>Total Applications</p>
+          <h2>{overview?.total_applications ?? 0}</h2>
+        </div>
+        <div className="stat-card">
+          <p>Pending Reviews</p>
+          <h2>{overview?.pending_reviews ?? 0}</h2>
+        </div>
+        <div className="stat-card">
+          <p>Approved</p>
+          <h2>{overview?.approved_applications ?? 0}</h2>
+        </div>
+        <div className="stat-card">
+          <p>Predictions</p>
+          <h2>{overview?.total_predictions ?? 0}</h2>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Active ML Model</h2>
+        <p className="muted">
+          {overview?.active_model_name
+            ? `${overview.active_model_name} (${overview.active_model_version})`
+            : "No active model found"}
+        </p>
+      </div>
+
+      <div className="card">
+        <h2>Recent Applications</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Applicant</th>
+                <th>Income</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {applications.slice(0, 10).map((item) => (
+                <tr key={item.id}>
+                  <td>#{item.id}</td>
+                  <td>{item.first_name} {item.last_name}</td>
+                  <td>{item.monthly_income ?? "-"}</td>
+                  <td><StatusBadge value={item.status} /></td>
+                  <td>{formatDate(item.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+function UserHomePage() {
+  const navigate = useNavigate();
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [message, setMessage] = useState("");
+
+  const loadData = async () => {
+    try {
+      const [appsResponse, unreadResponse] = await Promise.all([
+        api.get<Application[]>("/applications/my"),
+        api.get<{ unread_count: number }>("/notifications/unread-count"),
+      ]);
+
+      setApplications(appsResponse.data);
+      setUnread(unreadResponse.data.unread_count);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>User Home</h1>
+          <p>Submit applications and track status updates.</p>
+        </div>
+
+        <button className="btn primary" onClick={() => navigate("/apply")}>
+          New Application
+        </button>
+      </div>
+
+      {message && <div className="alert error">{message}</div>}
+
+      <div className="stats-grid">
+        <div className="stat-card">
+          <p>My Applications</p>
+          <h2>{applications.length}</h2>
+        </div>
+        <div className="stat-card">
+          <p>Unread Notifications</p>
+          <h2>{unread}</h2>
+        </div>
+        <div className="stat-card">
+          <p>Latest Status</p>
+          <h2>{applications[0]?.status?.replaceAll("_", " ") ?? "None"}</h2>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>My Applications</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Applicant</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {applications.map((item) => (
+                <tr key={item.id}>
+                  <td>#{item.id}</td>
+                  <td>{item.first_name} {item.last_name}</td>
+                  <td><StatusBadge value={item.status} /></td>
+                  <td>{formatDate(item.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+
+function ApplyPage() {
+  const [stepOne, setStepOne] = useState({
+    first_name: "Said",
+    last_name: "Kabir",
+    father_name: "Father Name",
+    mother_name: "Mother Name",
+    age: "25",
+    phone: "01700000000",
+    email: "applicant@example.com",
+    address: "Dhaka, Bangladesh",
+  });
+
+  const [stepTwo, setStepTwo] = useState({
+    occupation: "Software Developer",
+    monthly_income: "60000",
+  });
+
+  const [application, setApplication] = useState<Application | null>(null);
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [documents, setDocuments] = useState<ApplicationDocument[]>([]);
+  const [fields, setFields] = useState<ExtractedField[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [message, setMessage] = useState("");
+
+  const [incomeDocumentType, setIncomeDocumentType] = useState("salary_certificate");
+  const [identityDocumentType, setIdentityDocumentType] = useState("nid");
+
+  const [files, setFiles] = useState<Record<string, File | null>>({
+    incomeProof: null,
+    identityProof: null,
+    photo: null,
+    loanApplication: null,
+  });
+
+  const applicationId = application?.id;
+
+  const hasDocumentType = (type: string) => {
+    return documents.some((document) => document.document_type === type);
+  };
+
+  const hasIncomeProof = hasDocumentType("salary_certificate") || hasDocumentType("tin_certificate");
+  const hasIdentityProof = hasDocumentType("nid") || hasDocumentType("passport");
+  const hasPhoto = hasDocumentType("photo");
+  const hasGeneratedPdf = hasDocumentType("generated_pdf");
+  const hasLoanApplication = hasDocumentType("loan_application");
+
+  const isStepOneDone = Boolean(application);
+  const isStepTwoDone = Boolean(application?.occupation && application?.monthly_income !== null && application?.monthly_income !== undefined);
+  const isDocumentStepDone = hasIncomeProof && hasIdentityProof;
+  const isPhotoStepDone = hasPhoto;
+  const isReadyForPrediction = Boolean(isStepOneDone && isStepTwoDone);
+  const isReadyForReview = Boolean(isStepOneDone && isStepTwoDone && hasGeneratedPdf);
+
+  const latestPrediction = predictions[0];
+
+  const setFile = (key: string, file: File | null) => {
+    setFiles((current) => ({
+      ...current,
+      [key]: file,
+    }));
+  };
+
+  const loadMyApplications = async () => {
+    try {
+      const response = await api.get<Application[]>("/applications/my");
+      setMyApplications(response.data);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const loadDocuments = async (id: number) => {
+    const response = await api.get<ApplicationDocument[]>(`/applications/${id}/documents`);
+    setDocuments(response.data);
+  };
+
+  const loadFields = async (id: number) => {
+    const response = await api.get<ExtractedField[]>(`/applications/${id}/extracted-fields`);
+    setFields(response.data);
+  };
+
+  const loadPredictions = async (id: number) => {
+    const response = await api.get<Prediction[]>(`/predictions/applications/${id}`);
+    setPredictions(response.data);
+  };
+
+  const refreshSelectedApplication = async (id: number) => {
+    try {
+      const [applicationResponse] = await Promise.all([
+        api.get<Application>(`/applications/${id}`),
+        loadDocuments(id),
+        loadFields(id).catch(() => undefined),
+        loadPredictions(id).catch(() => undefined),
+      ]);
+
+      setApplication(applicationResponse.data);
+      await loadMyApplications();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const selectApplication = async (item: Application) => {
+    setApplication(item);
+    setMessage(`Selected application #${item.id}`);
+    await refreshSelectedApplication(item.id);
+  };
+
+  useEffect(() => {
+    loadMyApplications();
+  }, []);
+
+  const createStepOne = async () => {
+    setMessage("");
+
+    try {
+      const response = await api.post<Application>("/applications/step-1", {
+        ...stepOne,
+        age: Number(stepOne.age),
+      });
+
+      setApplication(response.data);
+      setMessage(`Step 1 confirmed. Application #${response.data.id} created.`);
+      await loadMyApplications();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const uploadDocumentBySlot = async (
+    slotKey: string,
+    documentType: string,
+    successMessage: string
+  ) => {
+    if (!applicationId) {
+      setMessage("Create or select an application first.");
+      return false;
+    }
+
+    const selectedFile = files[slotKey];
+
+    if (!selectedFile) {
+      setMessage("Please choose a file first.");
+      return false;
+    }
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    await api.post(
+      `/applications/${applicationId}/documents?document_type=${documentType}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    setFile(slotKey, null);
+    setMessage(successMessage);
+    await loadDocuments(applicationId);
+
+    return true;
+  };
+
+  const confirmStepTwo = async () => {
+    if (!applicationId) {
+      setMessage("Complete Step 1 first.");
+      return;
+    }
+
+    try {
+      const response = await api.patch<Application>(`/applications/${applicationId}/step-2`, {
+        occupation: stepTwo.occupation,
+        monthly_income: Number(stepTwo.monthly_income),
+      });
+
+      setApplication(response.data);
+
+      if (files.incomeProof) {
+        await uploadDocumentBySlot(
+          "incomeProof",
+          incomeDocumentType,
+          "Income proof uploaded."
+        );
+      }
+
+      if (files.identityProof) {
+        await uploadDocumentBySlot(
+          "identityProof",
+          identityDocumentType,
+          "Identity proof uploaded."
+        );
+      }
+
+      setMessage("Step 2 confirmed. Occupation, income, and selected documents saved.");
+      await refreshSelectedApplication(applicationId);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const confirmPhoto = async () => {
+    if (!applicationId) {
+      setMessage("Complete Step 1 first.");
+      return;
+    }
+
+    try {
+      if (!files.photo) {
+        setMessage("Choose photo/scan file first.");
+        return;
+      }
+
+      await uploadDocumentBySlot("photo", "photo", "Step 3 confirmed. Photo uploaded.");
+      await refreshSelectedApplication(applicationId);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const generatePdf = async () => {
+    if (!applicationId) {
+      setMessage("Create or select an application first.");
+      return;
+    }
+
+    try {
+      const response = await api.post<ApplicationDocument>(
+        `/applications/${applicationId}/generate-pdf`
+      );
+
+      setMessage(`PDF created successfully. Document ID: ${response.data.id}`);
+      await refreshSelectedApplication(applicationId);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const uploadLoanApplication = async () => {
+    if (!applicationId) {
+      setMessage("Create or select an application first.");
+      return;
+    }
+
+    try {
+      await uploadDocumentBySlot(
+        "loanApplication",
+        "loan_application",
+        "Loan application document uploaded."
+      );
+
+      await refreshSelectedApplication(applicationId);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const extractLatestPdf = async () => {
+    if (!applicationId) {
+      setMessage("Select application first.");
+      return;
+    }
+
+    const latestPdf = documents.find((document) => document.document_type === "generated_pdf");
+
+    if (!latestPdf) {
+      setMessage("Create PDF first, then extract fields.");
+      return;
+    }
+
+    try {
+      await api.post(
+        `/applications/${applicationId}/extract-text?document_id=${latestPdf.id}`
+      );
+
+      const response = await api.post<ExtractedField[]>(
+        `/applications/${applicationId}/extract-fields`
+      );
+
+      setFields(response.data);
+      setMessage("PDF text and fields extracted successfully.");
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const runPrediction = async () => {
+    if (!applicationId) {
+      setMessage("Select application first.");
+      return;
+    }
+
+    if (!isReadyForPrediction) {
+      setMessage("Complete Step 1 and Step 2 before prediction.");
+      return;
+    }
+
+    try {
+      const response = await api.post<Prediction>(
+        `/predictions/applications/${applicationId}/run`
+      );
+
+      setMessage(`Prediction completed: ${response.data.prediction_result}`);
+      await refreshSelectedApplication(applicationId);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const sendReview = async () => {
+    if (!applicationId) {
+      setMessage("Select application first.");
+      return;
+    }
+
+    if (!isReadyForReview) {
+      setMessage("Complete Step 1, Step 2, and create PDF before sending review.");
+      return;
+    }
+
+    try {
+      const response = await api.post<Application>(
+        `/applications/${applicationId}/send-review`
+      );
+
+      setApplication(response.data);
+      setMessage("Application sent for admin review.");
+      await refreshSelectedApplication(applicationId);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>Apply Page</h1>
+          <p>
+            Complete the loan application step by step, create PDF, run prediction, and send for review.
+          </p>
+        </div>
+
+        {application ? <StatusBadge value={application.status} /> : <span className="badge badge-created">New</span>}
+      </div>
+
+      {message && <div className="alert info">{message}</div>}
+
+      <div className="workflow-hero card">
+        <div>
+          <p className="eyebrow">Professional Apply Workflow</p>
+          <h2>Application → Documents → PDF → Prediction → Review</h2>
+          <p className="muted">
+            This page is directly connected with ML Model. After Step 1 and Step 2,
+            the active ML model can predict the application risk.
+          </p>
+        </div>
+
+        <div className="workflow-status-panel">
+          <div className={isStepOneDone ? "step-pill done" : "step-pill"}>
+            1. Form
+          </div>
+          <div className={isStepTwoDone ? "step-pill done" : "step-pill"}>
+            2. Income
+          </div>
+          <div className={isDocumentStepDone ? "step-pill done" : "step-pill"}>
+            3. Documents
+          </div>
+          <div className={isPhotoStepDone ? "step-pill done" : "step-pill"}>
+            4. Photo
+          </div>
+          <div className={hasGeneratedPdf ? "step-pill done" : "step-pill"}>
+            5. PDF
+          </div>
+          <div className={latestPrediction ? "step-pill done" : "step-pill"}>
+            6. ML
+          </div>
+        </div>
+      </div>
+
+      <div className="card selected-application-card">
+        <div>
+          <h2>Selected Application</h2>
+          {application ? (
+            <p>
+              Application #{application.id} — {application.first_name} {application.last_name} —{" "}
+              <StatusBadge value={application.status} />
+            </p>
+          ) : (
+            <p className="muted">No application selected yet. Start from Step 1.</p>
+          )}
+        </div>
+
+        <div className="actions">
+          <button className="btn secondary" onClick={loadMyApplications}>
+            Refresh My Applications
+          </button>
+        </div>
+      </div>
+
+      <div className="apply-step-card card">
+        <div className="step-header">
+          <div>
+            <span className="step-number">Step 01</span>
+            <h2>Personal Form</h2>
+            <p className="muted">Fill applicant personal information and confirm.</p>
+          </div>
+
+          {isStepOneDone ? <span className="badge badge-approved">Confirmed</span> : <span className="badge badge-created">Pending</span>}
+        </div>
+
+        <div className="form-grid">
+          {Object.entries(stepOne).map(([key, value]) => (
+            <div key={key}>
+              <label>{key.replaceAll("_", " ")}</label>
+              <input
+                value={value}
+                onChange={(event) =>
+                  setStepOne({ ...stepOne, [key]: event.target.value })
+                }
+              />
+            </div>
+          ))}
+        </div>
+
+        <button className="btn primary" onClick={createStepOne}>
+          Confirm Step 1
+        </button>
+      </div>
+
+      <div className="apply-step-card card">
+        <div className="step-header">
+          <div>
+            <span className="step-number">Step 02</span>
+            <h2>Occupation, Income and Required Documents</h2>
+            <p className="muted">
+              Add occupation, monthly income, salary/TIN certificate, and NID/passport.
+            </p>
+          </div>
+
+          {isStepTwoDone && isDocumentStepDone ? (
+            <span className="badge badge-approved">Confirmed</span>
+          ) : (
+            <span className="badge badge-pending_review">Needs documents</span>
+          )}
+        </div>
+
+        <div className="grid two">
+          <div>
+            <label>Occupation</label>
+            <input
+              value={stepTwo.occupation}
+              onChange={(event) =>
+                setStepTwo({ ...stepTwo, occupation: event.target.value })
+              }
+            />
+          </div>
+
+          <div>
+            <label>Monthly Income</label>
+            <input
+              value={stepTwo.monthly_income}
+              onChange={(event) =>
+                setStepTwo({ ...stepTwo, monthly_income: event.target.value })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="upload-grid">
+          <div className="upload-box">
+            <h3>Salary Certificate / TIN Certificate</h3>
+            <p className="muted">Upload applicant income proof.</p>
+
+            <label>Document Type</label>
+            <select
+              value={incomeDocumentType}
+              onChange={(event) => setIncomeDocumentType(event.target.value)}
+            >
+              <option value="salary_certificate">Salary Certificate</option>
+              <option value="tin_certificate">TIN Certificate</option>
+            </select>
+
+            <label>Upload Document</label>
+            <input
+              type="file"
+              onChange={(event) => setFile("incomeProof", event.target.files?.[0] ?? null)}
+            />
+
+            {hasIncomeProof && <p className="success-text">Income proof uploaded.</p>}
+          </div>
+
+          <div className="upload-box">
+            <h3>NID / Passport</h3>
+            <p className="muted">Upload identity verification document.</p>
+
+            <label>Document Type</label>
+            <select
+              value={identityDocumentType}
+              onChange={(event) => setIdentityDocumentType(event.target.value)}
+            >
+              <option value="nid">NID</option>
+              <option value="passport">Passport</option>
+            </select>
+
+            <label>Upload Document</label>
+            <input
+              type="file"
+              onChange={(event) => setFile("identityProof", event.target.files?.[0] ?? null)}
+            />
+
+            {hasIdentityProof && <p className="success-text">Identity proof uploaded.</p>}
+          </div>
+        </div>
+
+        <button className="btn primary" onClick={confirmStepTwo}>
+          Confirm Step 2
+        </button>
+      </div>
+
+      <div className="apply-step-card card">
+        <div className="step-header">
+          <div>
+            <span className="step-number">Step 03</span>
+            <h2>Scan Photo</h2>
+            <p className="muted">Upload applicant photo or scanned photo.</p>
+          </div>
+
+          {hasPhoto ? <span className="badge badge-approved">Confirmed</span> : <span className="badge badge-created">Pending</span>}
+        </div>
+
+        <div className="upload-box wide">
+          <h3>Applicant Photo</h3>
+          <input
+            type="file"
+            onChange={(event) => setFile("photo", event.target.files?.[0] ?? null)}
+          />
+
+          {hasPhoto && <p className="success-text">Photo uploaded.</p>}
+
+          <button className="btn primary" onClick={confirmPhoto}>
+            Confirm Step 3
+          </button>
+        </div>
+      </div>
+
+      <div className="grid two">
+        <div className="card">
+          <h2>Create PDF</h2>
+          <p className="muted">
+            After Step 1 and Step 2, create the system-generated application PDF.
+          </p>
+
+          <button className="btn secondary" onClick={generatePdf}>
+            Create PDF
+          </button>
+
+          {hasGeneratedPdf && (
+            <>
+              <p className="success-text">Generated PDF is ready.</p>
+              <button className="btn secondary" onClick={extractLatestPdf}>
+                Extract PDF Fields
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Apply for Loan</h2>
+          <p className="muted">
+            Upload final loan application document if needed, then run prediction or send review.
+          </p>
+
+          <label>Loan Application Document</label>
+          <input
+            type="file"
+            onChange={(event) => setFile("loanApplication", event.target.files?.[0] ?? null)}
+          />
+
+          <button className="btn secondary" onClick={uploadLoanApplication}>
+            Confirm Loan Application Upload
+          </button>
+
+          {hasLoanApplication && <p className="success-text">Loan application document uploaded.</p>}
+
+          <div className="workflow-actions">
+            <button
+              className="btn primary"
+              disabled={!isReadyForPrediction}
+              onClick={runPrediction}
+            >
+              Predict
+            </button>
+
+            <button
+              className="btn success"
+              disabled={!isReadyForReview}
+              onClick={sendReview}
+            >
+              Send Review
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid two">
+        <div className="card">
+          <h2>Prediction Result</h2>
+
+          {latestPrediction ? (
+            <div className="mini-card">
+              <strong>{latestPrediction.prediction_result.replaceAll("_", " ")}</strong>
+              <br />
+              <RiskBadge value={latestPrediction.risk_level} />
+              <p>{latestPrediction.reason}</p>
+              <small>Confidence: {formatPercent(latestPrediction.confidence_score)}</small>
+            </div>
+          ) : (
+            <p className="muted">No prediction yet. Complete Step 1 and Step 2, then click Predict.</p>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Extracted Fields</h2>
+
+          {fields.length === 0 && <p className="muted">No extracted fields yet.</p>}
+
+          {fields.map((item) => (
+            <div className="field-row" key={item.id}>
+              <strong>{item.field_name}</strong>
+              <span>{item.field_value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid two">
+        <div className="card">
+          <h2>Uploaded Documents</h2>
+
+          {documents.length === 0 && <p className="muted">No documents uploaded yet.</p>}
+
+          <div className="document-list">
+            {documents.map((document) => (
+              <div className="mini-card row-between" key={document.id}>
+                <div>
+                  <strong>#{document.id} — {document.document_type.replaceAll("_", " ")}</strong>
+                  <p>{document.original_file_name}</p>
+                  <small>{formatDate(document.uploaded_at)}</small>
+                </div>
+
+                <StatusBadge value="approved" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <h2>My Recent Applications</h2>
+
+          {myApplications.length === 0 && <p className="muted">No application found.</p>}
+
+          {myApplications.map((item) => (
+            <div className="mini-card row-between" key={item.id}>
+              <div>
+                <strong>#{item.id} — {item.first_name} {item.last_name}</strong>
+                <p><StatusBadge value={item.status} /></p>
+              </div>
+
+              <button className="btn secondary" onClick={() => selectApplication(item)}>
+                Use
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+
+function AdminReviewsPage() {
+  const [pending, setPending] = useState<Application[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [message, setMessage] = useState("");
+
+  const loadData = async () => {
+    try {
+      const [pendingResponse, reviewsResponse] = await Promise.all([
+        api.get<Application[]>("/reviews/pending"),
+        api.get<Review[]>("/reviews/all"),
+      ]);
+
+      setPending(pendingResponse.data);
+      setReviews(reviewsResponse.data);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const decide = async (applicationId: number, statusValue: string) => {
+    try {
+      await api.post<Review>(`/reviews/${applicationId}/decision`, {
+        review_status: statusValue,
+        review_note: notes[applicationId] || "",
+      });
+
+      setMessage("Review decision saved.");
+      await loadData();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>Admin Reviews</h1>
+          <p>Approve, reject, or request more information.</p>
+        </div>
+        <button className="btn secondary" onClick={loadData}>Refresh</button>
+      </div>
+
+      {message && <div className="alert info">{message}</div>}
+
+      <div className="card">
+        <h2>Pending Review Applications</h2>
+
+        {pending.length === 0 && <p className="muted">No pending applications.</p>}
+
+        {pending.map((item) => (
+          <div className="mini-card" key={item.id}>
+            <div className="row-between">
+              <div>
+                <strong>#{item.id} — {item.first_name} {item.last_name}</strong>
+                <p>Income: {item.monthly_income ?? "-"} | Phone: {item.phone}</p>
+                <StatusBadge value={item.status} />
+              </div>
+            </div>
+
+            <label>Review Note</label>
+            <textarea
+              value={notes[item.id] || ""}
+              onChange={(event) =>
+                setNotes({ ...notes, [item.id]: event.target.value })
+              }
+              placeholder="Write review note..."
+            />
+
+            <div className="actions">
+              <button className="btn success" onClick={() => decide(item.id, "approved")}>
+                Approve
+              </button>
+              <button className="btn danger" onClick={() => decide(item.id, "rejected")}>
+                Reject
+              </button>
+              <button className="btn warning" onClick={() => decide(item.id, "need_more_information")}>
+                Need More Info
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <h2>Review History</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Application</th>
+                <th>Status</th>
+                <th>Note</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reviews.map((item) => (
+                <tr key={item.id}>
+                  <td>#{item.id}</td>
+                  <td>#{item.application_id}</td>
+                  <td><StatusBadge value={item.review_status} /></td>
+                  <td>{item.review_note || "-"}</td>
+                  <td>{formatDate(item.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+function NotificationsPage() {
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [message, setMessage] = useState("");
+
+  const loadData = async () => {
+    try {
+      const response = await api.get<NotificationItem[]>("/notifications/my");
+      setNotifications(response.data);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const markRead = async (id: number) => {
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      await loadData();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const markAllRead = async () => {
+    try {
+      await api.patch("/notifications/mark-all-read");
+      await loadData();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>Notifications</h1>
+          <p>Application updates and admin decisions.</p>
+        </div>
+        <button className="btn secondary" onClick={markAllRead}>Mark All Read</button>
+      </div>
+
+      {message && <div className="alert error">{message}</div>}
+
+      <div className="card">
+        {notifications.length === 0 && <p className="muted">No notifications yet.</p>}
+
+        {notifications.map((item) => (
+          <div className={item.is_read ? "mini-card read" : "mini-card unread"} key={item.id}>
+            <div className="row-between">
+              <div>
+                <strong>{item.title}</strong>
+                <p>{item.message}</p>
+                <small>{formatDate(item.created_at)}</small>
+              </div>
+
+              {!item.is_read && (
+                <button className="btn secondary" onClick={() => markRead(item.id)}>
+                  Mark Read
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </AppLayout>
+  );
+}
+
+
+function MLModelPage() {
+  const [models, setModels] = useState<MLModel[]>([]);
+  const [activeModel, setActiveModel] = useState<MLModel | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [modelName, setModelName] = useState("Custom Baseline Model");
+  const [version, setVersion] = useState("v1");
+  const [description, setDescription] = useState("Created from frontend.");
+  const [message, setMessage] = useState("");
+
+  const loadData = async () => {
+    try {
+      const [modelsResponse, applicationsResponse, predictionsResponse] =
+        await Promise.all([
+          api.get<MLModel[]>("/ml-models/"),
+          api.get<Application[]>("/applications/admin/all"),
+          api.get<Prediction[]>("/predictions/admin/all"),
+        ]);
+
+      setModels(modelsResponse.data);
+      setApplications(applicationsResponse.data);
+      setPredictions(predictionsResponse.data);
+
+      try {
+        const activeResponse = await api.get<MLModel>("/ml-models/active");
+        setActiveModel(activeResponse.data);
+      } catch {
+        setActiveModel(null);
+      }
+
+      setMessage("");
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const createModel = async () => {
+    try {
+      await api.post("/ml-models/", {
+        model_name: modelName,
+        version,
+        description,
+      });
+
+      setMessage("Model created successfully.");
+      await loadData();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const deploy = async (id: number) => {
+    try {
+      await api.post(`/ml-models/${id}/deploy`);
+      setMessage("Model deployed successfully.");
+      await loadData();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const setActive = async (id: number) => {
+    try {
+      await api.post(`/ml-models/${id}/set-active`);
+      setMessage("Model activated successfully. Apply page predictions will now use this model.");
+      await loadData();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const deactivate = async (id: number) => {
+    try {
+      await api.post(`/ml-models/${id}/deactivate`);
+      setMessage("Model deactivated.");
+      await loadData();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const runPrediction = async (applicationId: number) => {
+    try {
+      const response = await api.post<Prediction>(
+        `/predictions/applications/${applicationId}/run`
+      );
+
+      setMessage(
+        `Prediction completed for application #${applicationId}: ${response.data.prediction_result}`
+      );
+
+      await loadData();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  const getPredictionForApplication = (applicationId: number) => {
+    return predictions.find((item) => item.application_id === applicationId);
+  };
+
+  const isApplicationReadyForPrediction = (application: Application) => {
+    return Boolean(application.occupation && application.monthly_income !== null && application.monthly_income !== undefined);
+  };
+
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>ML Model</h1>
+          <p>
+            Manage models and run predictions using applications created from the Apply page.
+          </p>
+        </div>
+
+        <button className="btn secondary" onClick={loadData}>Refresh</button>
+      </div>
+
+      {message && <div className="alert info">{message}</div>}
+
+      <div className="grid two">
+        <div className="card">
+          <h2>Active Prediction Model</h2>
+
+          {activeModel ? (
+            <>
+              <div className="field-row">
+                <strong>Model</strong>
+                <span>{activeModel.model_name}</span>
+              </div>
+
+              <div className="field-row">
+                <strong>Version</strong>
+                <span>{activeModel.version}</span>
+              </div>
+
+              <div className="field-row">
+                <strong>Status</strong>
+                <StatusBadge value={activeModel.status} />
+              </div>
+
+              <div className="field-row">
+                <strong>Accuracy</strong>
+                <span>{formatPercent(activeModel.accuracy)}</span>
+              </div>
+
+              <p className="muted">
+                This active model is used automatically when prediction runs from Apply page or ML Model page.
+              </p>
+            </>
+          ) : (
+            <div className="alert error">
+              No active model found. Deploy and activate one model before running predictions.
+            </div>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Apply → ML Workflow</h2>
+
+          <div className="field-row">
+            <strong>1. Apply Page</strong>
+            <span>Create application</span>
+          </div>
+
+          <div className="field-row">
+            <strong>2. Complete Step 2</strong>
+            <span>Occupation + income</span>
+          </div>
+
+          <div className="field-row">
+            <strong>3. Generate PDF / Upload Docs</strong>
+            <span>Document workflow</span>
+          </div>
+
+          <div className="field-row">
+            <strong>4. ML Model</strong>
+            <span>Run prediction</span>
+          </div>
+
+          <div className="field-row">
+            <strong>5. Reviews</strong>
+            <span>Admin decision</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Create Model</h2>
+
+        <div className="form-grid">
+          <div>
+            <label>Model Name</label>
+            <input value={modelName} onChange={(event) => setModelName(event.target.value)} />
+          </div>
+
+          <div>
+            <label>Version</label>
+            <input value={version} onChange={(event) => setVersion(event.target.value)} />
+          </div>
+
+          <div>
+            <label>Description</label>
+            <input value={description} onChange={(event) => setDescription(event.target.value)} />
+          </div>
+        </div>
+
+        <button className="btn primary" onClick={createModel}>Create Model</button>
+      </div>
+
+      <div className="card">
+        <h2>Model Registry</h2>
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Model</th>
+                <th>Status</th>
+                <th>Active</th>
+                <th>Accuracy</th>
+                <th>F1</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {models.map((item) => (
+                <tr key={item.id}>
+                  <td>#{item.id}</td>
+                  <td>{item.model_name} ({item.version})</td>
+                  <td><StatusBadge value={item.status} /></td>
+                  <td>{item.is_active ? "Yes" : "No"}</td>
+                  <td>{formatPercent(item.accuracy)}</td>
+                  <td>{formatPercent(item.f1_score)}</td>
+                  <td>
+                    <div className="actions">
+                      <button className="btn secondary" onClick={() => deploy(item.id)}>Deploy</button>
+                      <button className="btn success" onClick={() => setActive(item.id)}>Set Active</button>
+                      <button className="btn danger" onClick={() => deactivate(item.id)}>Deactivate</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+              {models.length === 0 && (
+                <tr>
+                  <td colSpan={7}>No models found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Application Prediction Center</h2>
+        <p className="muted">
+          Applications created from the Apply page appear here. Admin can run prediction from this page too.
+        </p>
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Application</th>
+                <th>Applicant</th>
+                <th>Income</th>
+                <th>Status</th>
+                <th>ML Readiness</th>
+                <th>Latest Prediction</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {applications.map((application) => {
+                const latestPrediction = getPredictionForApplication(application.id);
+                const ready = isApplicationReadyForPrediction(application);
+
+                return (
+                  <tr key={application.id}>
+                    <td>#{application.id}</td>
+                    <td>{application.first_name} {application.last_name}</td>
+                    <td>{application.monthly_income ?? "-"}</td>
+                    <td><StatusBadge value={application.status} /></td>
+                    <td>
+                      {ready ? (
+                        <span className="badge badge-approved">Ready</span>
+                      ) : (
+                        <span className="badge badge-rejected">Step 2 incomplete</span>
+                      )}
+                    </td>
+                    <td>
+                      {latestPrediction ? (
+                        <div>
+                          <strong>{latestPrediction.prediction_result.replaceAll("_", " ")}</strong>
+                          <br />
+                          <RiskBadge value={latestPrediction.risk_level} />
+                        </div>
+                      ) : (
+                        <span className="muted">No prediction</span>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        className="btn primary"
+                        disabled={!ready || !activeModel}
+                        onClick={() => runPrediction(application.id)}
+                      >
+                        Run Prediction
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {applications.length === 0 && (
+                <tr>
+                  <td colSpan={7}>No applications found. Create an application from Apply page first.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Prediction History</h2>
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Application</th>
+                <th>Result</th>
+                <th>Risk</th>
+                <th>Confidence</th>
+                <th>Reason</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {predictions.map((item) => (
+                <tr key={item.id}>
+                  <td>#{item.id}</td>
+                  <td>#{item.application_id}</td>
+                  <td>{item.prediction_result.replaceAll("_", " ")}</td>
+                  <td><RiskBadge value={item.risk_level} /></td>
+                  <td>{formatPercent(item.confidence_score)}</td>
+                  <td>{item.reason}</td>
+                  <td>{formatDate(item.created_at)}</td>
+                </tr>
+              ))}
+
+              {predictions.length === 0 && (
+                <tr>
+                  <td colSpan={7}>No prediction history yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+
+function ReportsPage() {
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [statusReport, setStatusReport] = useState<StatusCount[]>([]);
+  const [monthly, setMonthly] = useState<MonthlyReport[]>([]);
+  const [predictionReport, setPredictionReport] = useState<PredictionReport | null>(null);
+  const [reviewReport, setReviewReport] = useState<ReviewReport | null>(null);
+  const [message, setMessage] = useState("");
+
+  const loadData = async () => {
+    try {
+      const [
+        overviewResponse,
+        statusResponse,
+        monthlyResponse,
+        predictionResponse,
+        reviewResponse,
+      ] = await Promise.all([
+        api.get<DashboardOverview>("/reports/overview"),
+        api.get<StatusCount[]>("/reports/applications/status"),
+        api.get<MonthlyReport[]>("/reports/applications/monthly"),
+        api.get<PredictionReport>("/reports/predictions"),
+        api.get<ReviewReport>("/reports/reviews"),
+      ]);
+
+      setOverview(overviewResponse.data);
+      setStatusReport(statusResponse.data);
+      setMonthly(monthlyResponse.data);
+      setPredictionReport(predictionResponse.data);
+      setReviewReport(reviewResponse.data);
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const downloadCsv = async () => {
+    try {
+      const response = await api.get("/reports/export/applications", {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "smartloan_applications_report.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>Reports</h1>
+          <p>Dashboard, application, review, prediction, and CSV export.</p>
+        </div>
+
+        <div className="actions">
+          <button className="btn secondary" onClick={loadData}>Refresh</button>
+          <button className="btn primary" onClick={downloadCsv}>Download CSV</button>
+        </div>
+      </div>
+
+      {message && <div className="alert error">{message}</div>}
+
+      <div className="stats-grid">
+        <div className="stat-card"><p>Applications</p><h2>{overview?.total_applications ?? 0}</h2></div>
+        <div className="stat-card"><p>Predictions</p><h2>{overview?.total_predictions ?? 0}</h2></div>
+        <div className="stat-card"><p>Reviews</p><h2>{overview?.total_reviews ?? 0}</h2></div>
+        <div className="stat-card"><p>Users</p><h2>{overview?.total_users ?? 0}</h2></div>
+      </div>
+
+      <div className="grid two">
+        <div className="card">
+          <h2>Application Status</h2>
+          {statusReport.map((item) => (
+            <div className="field-row" key={item.status}>
+              <strong>{item.status.replaceAll("_", " ")}</strong>
+              <span>{item.count}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="card">
+          <h2>Prediction Report</h2>
+          <div className="field-row"><strong>Total</strong><span>{predictionReport?.total_predictions ?? 0}</span></div>
+          <div className="field-row"><strong>Low Risk</strong><span>{predictionReport?.low_risk ?? 0}</span></div>
+          <div className="field-row"><strong>Medium Risk</strong><span>{predictionReport?.medium_risk ?? 0}</span></div>
+          <div className="field-row"><strong>High Risk</strong><span>{predictionReport?.high_risk ?? 0}</span></div>
+        </div>
+      </div>
+
+      <div className="grid two">
+        <div className="card">
+          <h2>Review Report</h2>
+          <div className="field-row"><strong>Total</strong><span>{reviewReport?.total_reviews ?? 0}</span></div>
+          <div className="field-row"><strong>Approved</strong><span>{reviewReport?.approved ?? 0}</span></div>
+          <div className="field-row"><strong>Rejected</strong><span>{reviewReport?.rejected ?? 0}</span></div>
+          <div className="field-row"><strong>Need More Info</strong><span>{reviewReport?.need_more_information ?? 0}</span></div>
+        </div>
+
+        <div className="card">
+          <h2>Monthly Applications</h2>
+          {monthly.length === 0 && <p className="muted">No monthly data yet.</p>}
+          {monthly.map((item) => (
+            <div className="field-row" key={item.month}>
+              <strong>{item.month}</strong>
+              <span>{item.total_applications}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+function CreateAccountPage() {
+  const [form, setForm] = useState({
+    full_name: "New User",
+    email: "newuser@example.com",
+    phone: "01900000000",
+    password: "12345678",
+    role: "user",
+  });
+  const [message, setMessage] = useState("");
+
+  const createAccount = async () => {
+    try {
+      await api.post("/users/", form);
+      setMessage("Account created successfully.");
+    } catch (error) {
+      setMessage(getApiError(error));
+    }
+  };
+
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>Create Account</h1>
+          <p>Create admin or user accounts.</p>
+        </div>
+      </div>
+
+      {message && <div className="alert info">{message}</div>}
+
+      <div className="card">
+        <div className="form-grid">
+          <div>
+            <label>Full Name</label>
+            <input value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} />
+          </div>
+
+          <div>
+            <label>Email</label>
+            <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+          </div>
+
+          <div>
+            <label>Phone</label>
+            <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+          </div>
+
+          <div>
+            <label>Password</label>
+            <input value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
+          </div>
+
+          <div>
+            <label>Role</label>
+            <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+
+        <button className="btn primary" onClick={createAccount}>Create Account</button>
+      </div>
+    </AppLayout>
+  );
+}
+
+function AIPilotPage() {
+  return (
+    <AppLayout>
+      <div className="page-title">
+        <div>
+          <h1>AI Pilot</h1>
+          <p>RAG-ready and multi-agent assistant will connect after Backend Part 8.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Coming Next</h2>
+        <p>
+          After frontend core is stable, we will build Backend Part 8:
+          AI Pilot, RAG-ready document context, and multi-agent foundation.
+        </p>
+      </div>
+    </AppLayout>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+
+      <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <AdminDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/reviews"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <AdminReviewsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/ml-model"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <MLModelPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/reports"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <ReportsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/create-account"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <CreateAccountPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/ai-pilot"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <AIPilotPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/user/home"
+        element={
+          <ProtectedRoute roles={["user"]}>
+            <UserHomePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/user/notifications"
+        element={
+          <ProtectedRoute roles={["user"]}>
+            <NotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/apply"
+        element={
+          <ProtectedRoute roles={["admin", "user"]}>
+            <ApplyPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
+
+export default App;
