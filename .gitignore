@@ -7,6 +7,14 @@ node_modules/
 dist/
 frontend/dist/
 *.bak
+*.backup_before_*
+backend-backup-*/
+frontend-backup-*/
+smartloan-ai-final-backup/
+*.db
+backend/storage/
+backend/uploads/
+backend/data/
 .vscode/
 .DS_Store
 Thumbs.db
