@@ -24,11 +24,10 @@ Table of Contents
 
 - "Project Overview" (#project-overview)
 - "Project Objective" (#project-objective)
-- "Why This Project Matters" (#why-this-project-matters)
-- "Core Features" (#core-features)
+- "Key Features" (#key-features)
 - "Technology Stack" (#technology-stack)
 - "System Architecture" (#system-architecture)
-- "Main Application Workflow" (#main-application-workflow)
+- "Application Workflow" (#application-workflow)
 - "Machine Learning Workflow" (#machine-learning-workflow)
 - "PDF Intelligence Workflow" (#pdf-intelligence-workflow)
 - "Important Pages" (#important-pages)
@@ -36,8 +35,7 @@ Table of Contents
 - "Local Development Setup" (#local-development-setup)
 - "Docker Setup" (#docker-setup)
 - "Health Check URLs" (#health-check-urls)
-- "API Areas" (#api-areas)
-- "Docker Persistence Design" (#docker-persistence-design)
+- "API Modules" (#api-modules)
 - "Screenshots" (#screenshots)
 - "Demo Video Flow" (#demo-video-flow)
 - "Recruiter and Professor Review Notes" (#recruiter-and-professor-review-notes)
@@ -51,7 +49,7 @@ Project Overview
 
 SmartLoan AI is a realistic loan application processing platform designed to demonstrate practical software engineering, applied AI/ML integration, document intelligence, and end-to-end workflow automation.
 
-The platform allows an applicant to create a loan application, generate a loan PDF, upload documents, extract information from PDFs, run machine learning based loan risk prediction, send the application for review, and allow an admin or reviewer to approve or refuse the application.
+The system allows an applicant to create a loan application, generate a loan PDF, upload supporting documents, extract information from PDFs, run machine learning based loan risk prediction, send the application for review, and allow an admin or reviewer to approve or refuse the application.
 
 This project connects multiple real-world software components into one complete workflow:
 
@@ -62,7 +60,7 @@ This project connects multiple real-world software components into one complete 
 - PDF text extraction
 - OCR-based document processing
 - Machine learning prediction
-- Admin review system
+- Human review and approval system
 - Dashboard and reports
 - AI/RAG-style document assistant
 - Dockerized deployment
@@ -71,7 +69,7 @@ This project connects multiple real-world software components into one complete 
 
 Project Objective
 
-The main objective of SmartLoan AI is to simulate a real-world digital loan processing platform where user data, financial documents, machine learning prediction, document extraction, and human review are connected in one professional system.
+The main objective of SmartLoan AI is to simulate a real-world digital loan processing system where user data, financial documents, machine learning prediction, document extraction, and human review are connected in one professional platform.
 
 This project is suitable for:
 
@@ -87,35 +85,9 @@ This project is suitable for:
 
 ---
 
-Why This Project Matters
+Key Features
 
-SmartLoan AI is not a simple CRUD application. It demonstrates how a modern fintech-style system can combine:
-
-- User input
-- Document generation
-- Document upload
-- Text extraction
-- Structured data extraction
-- Machine learning prediction
-- Human review
-- Administrative decision-making
-- Reporting
-- Docker deployment
-
-Because of this, the project can be reviewed as:
-
-- An AI Engineering project
-- A Machine Learning Engineering project
-- A Backend Engineering project
-- A Full-Stack Development project
-- A Document Intelligence project
-- A Workflow Automation project
-
----
-
-Core Features
-
-1. Authentication & User Workflow
+Authentication and User Workflow
 
 - Login page
 - Create account page
@@ -125,7 +97,7 @@ Core Features
 - Admin/reviewer workflow concept
 - Clean navigation between system modules
 
-2. Loan Application Management
+Loan Application Management
 
 - Professional Apply page
 - Personal information section
@@ -134,9 +106,9 @@ Core Features
 - Clean form input workflow
 - Application data saving
 - Dynamic loan application process
-- Professional blank form fields instead of hardcoded sample data
+- Professional blank form fields instead of hardcoded sample values
 
-3. PDF Generation
+PDF Generation
 
 - Generate loan application PDF
 - Include applicant summary
@@ -146,7 +118,7 @@ Core Features
 - Download generated PDF
 - Use generated PDF as part of the loan submission workflow
 
-4. PDF Upload & Document Extraction
+PDF Upload and Document Extraction
 
 - Upload generated or external loan PDF
 - Extract readable text from PDF
@@ -164,7 +136,7 @@ Example extracted information may include:
 - Mother name
 - Age
 - Phone number
-- Email
+- Email address
 - Address
 - Occupation
 - Monthly income
@@ -174,7 +146,7 @@ Example extracted information may include:
 - Monthly salary
 - NID or scanned document text when OCR is possible
 
-5. Review Management System
+Review Management System
 
 - Send loan application for review
 - Create review record
@@ -187,7 +159,7 @@ Example extracted information may include:
 - Admin can approve or refuse loan application
 - Clean card-based review interface
 
-6. Machine Learning Risk Prediction
+Machine Learning Risk Prediction
 
 - Loan approval probability
 - Risk score
@@ -198,7 +170,7 @@ Example extracted information may include:
 - Model serving workflow
 - Prediction connected with Apply page
 
-7. Dashboard & Reports
+Dashboard and Reports
 
 - Dashboard overview
 - Application statistics
@@ -207,7 +179,7 @@ Example extracted information may include:
 - Management-level insights
 - Portfolio-ready admin interface
 
-8. AI Pilot / RAG Assistant
+AI Pilot / RAG Assistant
 
 - AI document assistant concept
 - Store document text
@@ -216,7 +188,7 @@ Example extracted information may include:
 - Demonstrates retrieval-style AI workflow
 - Shows how AI can support financial document understanding
 
-9. Docker Deployment
+Docker Deployment
 
 - Dockerized backend
 - Dockerized frontend
@@ -246,51 +218,94 @@ Storage| Local file storage, uploads, generated PDFs, Docker volume mapping
 
 System Architecture
 
-flowchart TD
-    A[Applicant / Admin User] --> B[React + Vite Frontend]
-    B --> C[FastAPI Backend API]
-    C --> D[SQLite Database]
-    C --> E[File Storage]
-    C --> F[PDF Generation Service]
-    C --> G[PDF Extraction Service]
-    C --> H[ML Prediction Service]
-    C --> I[AI / RAG Document Assistant]
-
-    D --> J[Applications, Users, Reviews]
-    E --> K[Uploads, Generated PDFs, Documents]
-    H --> L[Risk Score, Approval Probability, Risk Band]
-    G --> M[Readable Text and Structured Fields]
+Applicant / Admin User
+        |
+        v
+React + Vite Frontend
+        |
+        v
+FastAPI Backend API
+        |
+        +-----------------------------+
+        |                             |
+        v                             v
+SQLite Database                 File Storage
+        |                             |
+        v                             v
+Users, Applications, Reviews    Uploads, PDFs, Documents
+        |
+        +-----------------------------+
+        |                             |
+        v                             v
+ML Prediction Service       AI / RAG Document Assistant
+        |
+        v
+Risk Score, Approval Probability, Risk Band
 
 ---
 
-Main Application Workflow
+Application Workflow
 
-flowchart TD
-    A[Create Account / Login] --> B[Dashboard]
-    B --> C[Apply Page]
-    C --> D[Fill Applicant, Employment and Loan Information]
-    D --> E[Generate Loan PDF]
-    E --> F[Download PDF]
-    F --> G[Upload PDF]
-    G --> H[Extract PDF Text]
-    H --> I[Extract Structured Fields]
-    I --> J[Run ML Prediction]
-    J --> K[Send for Review]
-    K --> L[Admin Review Page]
-    L --> M[Approve or Refuse Application]
-    M --> N[Reports and Dashboard Update]
+Create Account / Login
+        |
+        v
+Dashboard
+        |
+        v
+Apply Page
+        |
+        v
+Fill Applicant, Employment and Loan Information
+        |
+        v
+Generate Loan PDF
+        |
+        v
+Download PDF
+        |
+        v
+Upload PDF
+        |
+        v
+Extract PDF Text
+        |
+        v
+Extract Structured Fields
+        |
+        v
+Run ML Prediction
+        |
+        v
+Send for Review
+        |
+        v
+Admin Review Page
+        |
+        v
+Approve or Refuse Application
+        |
+        v
+Reports and Dashboard Update
 
 ---
 
 Machine Learning Workflow
 
-flowchart LR
-    A[Applicant Loan Data] --> B[Feature Preparation]
-    B --> C[Active ML Model]
-    C --> D[Approval Probability]
-    C --> E[Risk Score]
-    C --> F[Risk Band]
-    F --> G[Prediction Explanation]
+Applicant Loan Data
+        |
+        v
+Feature Preparation
+        |
+        v
+Active ML Model
+        |
+        +-----------------------------+
+        |              |              |
+        v              v              v
+Approval Probability  Risk Score      Risk Band
+        |
+        v
+Prediction Explanation
 
 The machine learning module is designed to demonstrate practical model serving inside a business workflow. The ML output helps a reviewer understand the possible risk level of a loan application.
 
@@ -298,14 +313,25 @@ The machine learning module is designed to demonstrate practical model serving i
 
 PDF Intelligence Workflow
 
-flowchart LR
-    A[Uploaded PDF] --> B[Text Layer Extraction]
-    B --> C{Text Found?}
-    C -->|Yes| D[Readable Text]
-    C -->|No| E[OCR Fallback]
-    E --> D
-    D --> F[Structured Field Extraction]
-    F --> G[Review and ML Prediction Workflow]
+Uploaded PDF
+        |
+        v
+PDF Text Layer Extraction
+        |
+        v
+Text Found?
+   |             |
+   | Yes         | No
+   v             v
+Readable Text    OCR Fallback
+   |             |
+   +------<------+
+        |
+        v
+Structured Field Extraction
+        |
+        v
+Review and ML Prediction Workflow
 
 This workflow is important because real loan documents often contain:
 
@@ -424,7 +450,7 @@ http://localhost:20000/api/v1/ai-rag/health
 
 ---
 
-API Areas
+API Modules
 
 The backend is organized into modular API areas:
 
@@ -553,13 +579,9 @@ Author
 
 Tankim Prio
 
-GitHub:
+GitHub: "https://github.com/tankim-prio" (https://github.com/tankim-prio)
 
-https://github.com/tankim-prio
-
-Repository:
-
-https://github.com/tankim-prio/smartloan-ai
+Repository: "https://github.com/tankim-prio/smartloan-ai" (https://github.com/tankim-prio/smartloan-ai)
 
 ---
 
