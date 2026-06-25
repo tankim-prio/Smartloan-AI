@@ -99,43 +99,43 @@ SmartLoan AI is not a simple CRUD application. It demonstrates how a modern fint
 
 ## Core Features
 
-### 🔐 Authentication & User Workflow
+### Authentication & User Workflow
 * Secure login and account creation
 * Personalized user profile management
 * Role-based view logic separation (Applicant vs. Admin/Reviewer workflow)
 
-### 📋 Loan Application Management
+### Loan Application Management
 * Form workflow capturing Personal, Employment, Financial, and Loan details
 * Dynamic draft state saving
 * Clean inputs designed to process fresh application data seamlessly rather than relying on static mock examples
 
-### 📄 PDF Generation
+### PDF Generation
 * Programmatic generation of comprehensive loan application documents
 * Supports embedding applicant summaries, asset checklists, and space placeholders for official verification attachments
 
-### 🔍 PDF Upload & Document Extraction
+### PDF Upload & Document Extraction
 * Deep text extraction layer for native digital PDFs
 * Built-in **OCR Fallback engine** to process scanned physical sheets or uploaded images (Salary certificates, NID cards, passports)
 * Fully structured field mapping extracting metadata such as *Monthly Income, Designation, ID serial digits, and Employer credentials*
 
-### ⚖️ Review Management System
+### Review Management System
 * Interactive administrative board displaying Pending, Approved, and Refused requests
 * Comprehensive inspection utility displaying parsed asset text alongside system recommendations
 
-### 🤖 Machine Learning Risk Prediction
+### Machine Learning Risk Prediction
 * On-the-fly **Approval Probability** mapping
 * Numerical **Risk Scoring engine** segments requests into high/medium/low risk bands
 * Human-readable prediction insight strings explaining the primary driving weights behind the model's logic
 
-### 📊 Dashboard & Reports
+### Dashboard & Reports
 * Exec-level interactive charts displaying pipeline velocity, loss metrics, and state counts
 * Historical metrics parsing for performance evaluation
 
-### ✈️ AI Pilot / RAG Assistant
+### AI Pilot / RAG Assistant
 * Localized semantic search context container using internal policy documentation
 * Natural language prompt engine built to assist agents with loan eligibility rule auditing
 
-### 🐳 Docker Deployment
+### Docker Deployment
 * Modular orchestration breaking dependencies into specific frontend, backend, and reverse proxy containers
 * Multi-stage build architectures pinning dependencies accurately
 
@@ -175,7 +175,7 @@ flowchart TD
     G --> M[Readable Text and Structured Fields]
 ```
 
-## Database Schema Overview
+### Database Schema Overview
 
 The SQLite database consists of the following core tables, designed for clarity and performance:
 
