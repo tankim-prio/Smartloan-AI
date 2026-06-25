@@ -175,7 +175,7 @@ flowchart TD
     G --> M[Readable Text and Structured Fields]
 ```
 
-### Database Schema Overview
+## Database Schema Overview
 
 The SQLite database consists of the following core tables, designed for clarity and performance:
 
