@@ -580,7 +580,7 @@ Customer account information, account status, role details, and permitted system
 
 A centralized overview of applications, customers, staff accounts, review decisions, ML predictions, document processing, and recent activity.
 
-![SmartLoan AI Administrative Dashboard](<assets/screenshots/01. Dashboard(1).jpeg>)
+![SmartLoan AI Administrative Dashboard](<assets/screenshots/01. Dashboard.jpeg>)
 
 #### Loan Application Form
 
