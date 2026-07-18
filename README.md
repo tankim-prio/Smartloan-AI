@@ -14,6 +14,32 @@ SmartLoan AI is a professional full-stack AI/ML portfolio project that demonstra
 ![Status](https://img.shields.io/badge/Status-Completed-success)
 
 ---
+## 🎬 Project Demonstration
+
+Watch the complete **SmartLoan AI** demonstration to explore its end-to-end loan-processing workflow—from customer onboarding and document submission to PDF extraction, ML-powered risk assessment, administrative review, reporting, and model management.
+
+<p align="center">
+  <a href="https://youtu.be/8sybUFMUUj8">
+    <img
+      src="assets/screenshots/smartloan-ai-youtube-thumbnail.png"
+      alt="SmartLoan AI — Full Project Demonstration"
+      width="850"
+    />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/8sybUFMUUj8">
+    <img
+      src="https://img.shields.io/badge/▶%20Watch%20Full%20Demo-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white"
+      alt="Watch SmartLoan AI Full Demo on YouTube"
+    />
+  </a>
+</p>
+
+<p align="center">
+  <strong>FastAPI · React · Machine Learning · PDF/OCR · MLOps · AI Pilot</strong>
+</p>
 
 ## Repository
 **GitHub:** [https://github.com/tankim-prio/smartloan-ai](https://github.com/tankim-prio/smartloan-ai)
