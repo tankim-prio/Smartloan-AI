@@ -536,14 +536,116 @@ This ensures data survives container restarts and allows easy backup/migration.
 
 ---
 
-## Screenshots
-*(Replace with actual screen captures from your running application)*
-- Login page
-- Loan application multi-step form
-- Document upload & extraction results
-- Admin review board with ML insight panel
-- Dashboard with charts
-- AI Assistant chat window
+## Application Screenshots
+
+A visual overview of the SmartLoan AI platform, covering customer onboarding, loan application processing, document intelligence, machine-learning predictions, administrative review, reporting, and role-based account management.
+
+---
+
+### 1. Authentication and Customer Onboarding
+
+#### Secure Login
+
+Role-based portal access for customers, administrators, reviewers, loan officers, ML managers, and auditors.
+
+![SmartLoan AI Login](<assets/screenshots/Login.jpeg>)
+
+#### Customer Account Registration
+
+Customer registration with restricted access to the loan application and profile modules.
+
+![Customer Account Registration](<assets/screenshots/Create Customer Account.jpeg>)
+
+---
+
+### 2. Customer Loan Application Workflow
+
+#### Customer Loan Application
+
+A structured application workflow for personal information, income details, document uploads, photo capture, PDF generation, information extraction, ML prediction, and review submission.
+
+![Customer Loan Application](<assets/screenshots/09. Apply ( User).jpeg>)
+
+#### Customer Profile
+
+Customer account information, account status, role details, and permitted system modules.
+
+![Customer Profile](<assets/screenshots/010. Profile (User).jpeg>)
+
+---
+
+### 3. Admin Dashboard and Application Processing
+
+#### Administrative Dashboard
+
+A centralized overview of applications, customers, staff accounts, review decisions, ML predictions, document processing, and recent activity.
+
+![SmartLoan AI Administrative Dashboard](<assets/screenshots/01. Dashboard(1).jpeg>)
+
+#### Loan Application Form
+
+The administrative application interface for entering applicant details and uploading supporting documents.
+
+![Administrative Loan Application Form](<assets/screenshots/02. Apply.jpeg>)
+
+#### Completed Application Workflow
+
+The complete workflow covering applicant information, supporting documents, generated PDF, extracted text, structured fields, prediction results, and review notifications.
+
+![Completed Loan Application Workflow](<assets/screenshots/02. Apply (fill up).jpeg>)
+
+---
+
+### 4. Review and Decision Management
+
+#### Application Review
+
+Administrative review queue for searching, inspecting, approving, or refusing submitted loan applications.
+
+![Loan Application Review Management](<assets/screenshots/03. Review.jpeg>)
+
+---
+
+### 5. Machine Learning and MLOps
+
+#### ML Model Management
+
+Model registration, dataset and model uploads, deployment, active-model selection, prediction execution, artifact inspection, and prediction history.
+
+![Machine Learning Model Management](<assets/screenshots/04. ML model.jpeg>)
+
+---
+
+### 6. Reports and AI Assistance
+
+#### Reports and Analytics
+
+Application statistics, approval trends, risk distribution, model usage, document-processing summaries, and ML-versus-review comparisons.
+
+![SmartLoan AI Reports and Analytics](<assets/screenshots/05. Reports.jpeg>)
+
+#### AI Pilot
+
+An AI-powered assistant for querying applications, predictions, review decisions, active models, documents, and reports.
+
+![SmartLoan AI Pilot](<assets/screenshots/06. AI pilot.jpeg>)
+
+---
+
+### 7. Account and Permission Management
+
+#### Staff Account Management
+
+Role-based staff account creation with configurable permissions for administrators, reviewers, loan officers, ML managers, and auditors.
+
+![Staff Account and Permission Management](<assets/screenshots/07. Create Account (For admins).jpeg>)
+
+#### Administrator Profile
+
+Administrator information, organizational details, account status, and assigned system permissions.
+
+![Administrator Profile](<assets/screenshots/08. Profile (admin).jpeg>)
+
 
 ---
 
